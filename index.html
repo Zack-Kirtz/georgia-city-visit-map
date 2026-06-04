@@ -1,4 +1,3 @@
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 const SUPABASE_URL = 'https://foshraaftkinhnnchnwf.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_secret_nkdOSSCzHVsbk4FbxGqK0w_ASDCHqAK';
 
@@ -6,489 +5,217 @@ const supabase = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
 );
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Georgia Cities — Visit Tracker</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap');
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+let map;
+let geojsonLayer;
+let selectedFeature = null;
+let currentFilter = 'all';
+let cityData = {};
 
-  :root {
-    --pine: #1a3a2a;
-    --pine-mid: #2d5a40;
-    --pine-light: #4a7c5f;
-    --cream: #f5f0e8;
-    --cream-dark: #ede6d6;
-    --gold: #c8922a;
-    --gold-light: #e8b84b;
-    --visited: #2d7a4a;
-    --unvisited: #8ba89a;
-    --text: #1a2520;
-    --text-muted: #5a6b62;
-    --panel-bg: rgba(245, 240, 232, 0.96);
-  }
-
-  html, body { height: 100%; width: 100%; overflow: hidden; font-family: 'DM Sans', sans-serif; }
-
-  .leaflet-interactive:focus { outline: none; }
-
-  #map { position: absolute; inset: 0; }
-
-  /* Header */
-  #header {
-    position: absolute; top: 0; left: 0; right: 0; z-index: 1000;
-    background: var(--pine);
-    padding: 14px 24px;
-    display: flex; align-items: center; justify-content: space-between;
-    border-bottom: 2px solid var(--gold);
-  }
-  #header h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 20px; font-weight: 600;
-    color: var(--cream);
-    letter-spacing: 0.02em;
-  }
-  #header h1 span { color: var(--gold-light); }
-
-  #progress-wrap {
-    display: flex; align-items: center; gap: 16px;
-  }
-  #progress-label {
-    font-size: 13px; color: var(--cream-dark); opacity: 0.85;
-    white-space: nowrap;
-  }
-  #progress-bar-outer {
-    width: 180px; height: 6px;
-    background: rgba(255,255,255,0.15);
-    border-radius: 3px; overflow: hidden;
-  }
-  #progress-bar-inner {
-    height: 100%; background: var(--gold);
-    border-radius: 3px;
-    transition: width 0.4s ease;
-  }
-  #pct { font-size: 13px; color: var(--gold-light); font-weight: 500; }
-
-  /* Sidebar */
-  #sidebar {
-    position: absolute; top: 58px; right: 0; bottom: 0; z-index: 900;
-    width: 300px;
-    background: var(--panel-bg);
-    border-left: 1px solid rgba(26,58,42,0.15);
-    display: flex; flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-    overflow: hidden;
-  }
-  #sidebar.open { transform: translateX(0); }
-
-  #sidebar-header {
-    padding: 20px 20px 16px;
-    border-bottom: 1px solid rgba(26,58,42,0.12);
-    flex-shrink: 0;
-  }
-  #sidebar-city {
-    font-family: 'Playfair Display', serif;
-    font-size: 22px; font-weight: 600;
-    color: var(--pine); line-height: 1.2;
-    margin-bottom: 6px;
-  }
-  #sidebar-acres {
-    font-size: 12px; color: var(--text-muted); letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-
-  #sidebar-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 12px; border-radius: 20px;
-    font-size: 12px; font-weight: 500; letter-spacing: 0.03em;
-    margin-top: 10px;
-  }
-  #sidebar-badge.visited-badge { background: #d4edda; color: #1a5c32; }
-  #sidebar-badge.unvisited-badge { background: #e8ede9; color: #4a6355; }
-  #sidebar-badge .dot {
-    width: 7px; height: 7px; border-radius: 50%;
-  }
-  #sidebar-badge.visited-badge .dot { background: #2d7a4a; }
-  #sidebar-badge.unvisited-badge .dot { background: #8ba89a; }
-
-  #sidebar-body {
-    padding: 20px; flex: 1; overflow-y: auto;
-    display: flex; flex-direction: column; gap: 16px;
-  }
-
-  .field-label {
-    font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
-    color: var(--text-muted); margin-bottom: 5px; font-weight: 500;
-  }
-  .field-value {
-    font-size: 14px; color: var(--text); line-height: 1.5;
-  }
-
-  .field-input {
-    width: 100%; padding: 8px 10px;
-    border: 1px solid rgba(26,58,42,0.2);
-    border-radius: 6px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    background: white;
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .field-input:focus { border-color: var(--pine-mid); }
-
-  textarea.field-input { resize: vertical; min-height: 80px; }
-
-  #sidebar-actions {
-    padding: 16px 20px;
-    border-top: 1px solid rgba(26,58,42,0.12);
-    display: flex; gap: 10px;
-    flex-shrink: 0;
-  }
-
-  .btn {
-    flex: 1; padding: 9px 14px;
-    border-radius: 6px; border: none;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px; font-weight: 500;
-    cursor: pointer; transition: all 0.15s;
-  }
-  .btn-primary {
-    background: var(--pine); color: var(--cream);
-  }
-  .btn-primary:hover { background: var(--pine-mid); }
-  .btn-secondary {
-    background: transparent; color: var(--text-muted);
-    border: 1px solid rgba(26,58,42,0.2);
-  }
-  .btn-secondary:hover { background: var(--cream-dark); }
-
-  /* Close button */
-  #close-btn {
-    position: absolute; top: 16px; right: 16px;
-    background: none; border: none;
-    font-size: 20px; cursor: pointer;
-    color: var(--text-muted); line-height: 1;
-    padding: 4px; z-index: 1;
-  }
-  #close-btn:hover { color: var(--pine); }
-
-  /* Controls */
-  #controls {
-    position: absolute; top: 70px; left: 16px; z-index: 800;
-    display: flex; flex-direction: column; gap: 8px;
-  }
-  .control-pill {
-    background: white; border: 1px solid rgba(26,58,42,0.15);
-    border-radius: 20px; padding: 6px 14px;
-    font-size: 12px; font-weight: 500; cursor: pointer;
-    color: var(--text); transition: all 0.15s;
-    display: flex; align-items: center; gap: 6px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-    white-space: nowrap;
-  }
-  .control-pill:hover { background: var(--cream); border-color: var(--pine-light); }
-  .control-pill.active { background: var(--pine); color: var(--cream); border-color: var(--pine); }
-  .control-pill .pill-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-
-  /* Stats box */
-  #stats-box {
-    position: absolute; bottom: 24px; left: 16px; z-index: 800;
-    background: var(--panel-bg);
-    border: 1px solid rgba(26,58,42,0.15);
-    border-radius: 10px; padding: 14px 18px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
-    min-width: 160px;
-  }
-  #stats-box .stat-num {
-    font-family: 'Playfair Display', serif;
-    font-size: 28px; font-weight: 600;
-    color: var(--pine); line-height: 1;
-  }
-  #stats-box .stat-label {
-    font-size: 11px; color: var(--text-muted); letter-spacing: 0.05em;
-    text-transform: uppercase; margin-top: 3px;
-  }
-  #stats-box .stat-row { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(26,58,42,0.1); }
-
-  /* Leaflet overrides */
-  .leaflet-container { font-family: 'DM Sans', sans-serif; background: #e8ede6; }
-  .leaflet-popup-content-wrapper {
-    border-radius: 8px !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.12) !important;
-  }
-
-  /* Airtable info banner */
-  #airtable-banner {
-    position: absolute; bottom: 24px; right: 16px; z-index: 800;
-    background: var(--pine);
-    color: var(--cream); border-radius: 10px;
-    padding: 12px 16px; max-width: 240px;
-    font-size: 12px; line-height: 1.5;
-    opacity: 0.92;
-  }
-  #airtable-banner strong { color: var(--gold-light); display: block; margin-bottom: 4px; font-size: 13px; }
-  #airtable-banner a { color: var(--gold-light); }
-
-  /* Save toast */
-  #toast {
-    position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
-    background: var(--pine); color: var(--cream);
-    padding: 10px 20px; border-radius: 20px;
-    font-size: 13px; z-index: 2000;
-    opacity: 0; transition: opacity 0.3s;
-    pointer-events: none; white-space: nowrap;
-  }
-  #toast.show { opacity: 1; }
-</style>
-</head>
-<body>
-
-<div id="map"></div>
-
-<div id="header">
-  <h1>Georgia Cities <span> Visit Tracker</span></h1>
-  <div id="progress-wrap">
-    <div id="progress-label">0 of 542 cities visited</div>
-    <div id="progress-bar-outer">
-      <div id="progress-bar-inner" style="width:0%"></div>
-    </div>
-    <div id="pct">0%</div>
-  </div>
-</div>
-
-<div id="controls">
-  <div class="control-pill active" id="filter-all" onclick="setFilter('all')">
-    All cities
-  </div>
-  <div class="control-pill" id="filter-visited" onclick="setFilter('visited')">
-    <div class="pill-dot" style="background:#2d7a4a"></div> Visited
-  </div>
-  <div class="control-pill" id="filter-unvisited" onclick="setFilter('unvisited')">
-    <div class="pill-dot" style="background:#8ba89a"></div> Unvisited
-  </div>
-</div>
-
-<div id="stats-box">
-  <div class="stat-num" id="stat-visited">11</div>
-  <div class="stat-label">Cities visited</div>
-  <div class="stat-row">
-    <div class="stat-num" style="font-size:18px" id="stat-remaining">531</div>
-    <div class="stat-label">Remaining</div>
-  </div>
-</div>
-
-<div id="sidebar">
-  <button id="close-btn" onclick="closeSidebar()">✕</button>
-  <div id="sidebar-header">
-    <div id="sidebar-city">City Name</div>
-    <div id="sidebar-badge" class="unvisited-badge">
-      <div class="dot"></div>
-      <span id="badge-text">Not yet visited</span>
-    </div>
-  </div>
-  <div id="sidebar-body">
-    <div>
-      <div class="field-label">Visited?</div>
-      <select class="field-input" id="edit-visited">
-        <option value="No">No</option>
-        <option value="Yes">Yes</option>
-      </select>
-    </div>
-    <div>
-      <div class="field-label">Visit date</div>
-      <input type="date" class="field-input" id="edit-date">
-    </div>
-    <div>
-      <div class="field-label">Notes</div>
-      <textarea class="field-input" id="edit-notes" placeholder=""></textarea>
-    </div>
-    <div>
-      <div class="field-label">Photo URL</div>
-      <input type="url" class="field-input" id="edit-photo" placeholder="https://...">
-      <div id="photo-preview" style="margin-top:8px;display:none">
-        <img id="photo-img" style="width:100%;border-radius:6px;max-height:160px;object-fit:cover" src="" alt="">
-      </div>
-    </div>
-  </div>
-  <div id="sidebar-actions">
-    <button class="btn btn-secondary" onclick="closeSidebar()">Cancel</button>
-    <button class="btn btn-primary" onclick="saveCity()">Save visit</button>
-  </div>
-</div>
-
-
-<div id="toast">✓ Visit saved!</div>
-
-<script>
 async function loadVisitData() {
+
   const { data, error } = await supabase
     .from('city_visits')
     .select('*');
 
   if (error) {
-    console.error(error);
+    console.error('Supabase Load Error:', error);
     return;
   }
 
   data.forEach(row => {
-    cityData[row.name] = {
-      visited: row.visited,
-      visit_date: row.visit_date,
-      notes: row.notes,
-      photo: row.photo_url
+
+    cityData[row.city_name] = {
+      visited: row.visited || 'No',
+      visit_date: row.visit_date || '',
+      notes: row.notes || '',
+      photo: row.photo_url || ''
     };
+
   });
 
-  loadVisitData();
+  renderLayer(GEOJSON);
+  updateStats();
 }
-let map, geojsonLayer, selectedFeature = null, currentFilter = 'all';
-let cityData = {};
 
 function initMap() {
+
   map = L.map('map', {
     zoomControl: true,
     center: [32.8, -83.2],
     zoom: 7,
-    minZoom: 6, maxZoom: 14
+    minZoom: 6,
+    maxZoom: 14
   });
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO',
-    subdomains: 'abcd', maxZoom: 19
-  }).addTo(map);
+  L.tileLayer(
+    'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    {
+      attribution: '© OpenStreetMap © CARTO',
+      subdomains: 'abcd',
+      maxZoom: 19
+    }
+  ).addTo(map);
 
-  const gj = GEOJSON;
-  gj.features.forEach(f => {
-    const p = f.properties;
-    cityData[p.name] = {
-      visited: p.visited || 'No',
-      visit_date: p.visit_date || '',
-      notes: p.notes || '',
-      photo: p.photo || '',
-      acres: p.acres || 0,
-      centroid_lat: p.centroid_lat,
-      centroid_lng: p.centroid_lng
-    };
+  GEOJSON.features.forEach(feature => {
+
+    const p = feature.properties;
+
+    if (!cityData[p.name]) {
+
+      cityData[p.name] = {
+        visited: 'No',
+        visit_date: '',
+        notes: '',
+        photo: '',
+        acres: p.acres || 0,
+        centroid_lat: p.centroid_lat,
+        centroid_lng: p.centroid_lng
+      };
+
+    }
+
   });
 
-  renderLayer(gj);
-  updateStats();
-}
-
-function getStyle(feature) {
-  const d = cityData[feature.properties.name];
-  const isVisited = d && d.visited === 'Yes';
-  return {
-    fillColor: isVisited ? '#2d7a4a' : '#c8ddd4',
-    fillOpacity: isVisited ? 0.8 : 0.6,
-    color: isVisited ? '#1a5c32' : '#000000',
-    weight: isVisited ? 2 : 2,
-    opacity: 1
-  };
 }
 
 function renderLayer(gj) {
-  if (geojsonLayer) map.removeLayer(geojsonLayer);
+
+  if (geojsonLayer) {
+    map.removeLayer(geojsonLayer);
+  }
 
   const filtered = {
     ...gj,
-    features: gj.features.filter(f => {
-      const d = cityData[f.properties.name];
-      const visited = d && d.visited === 'Yes';
-      if (currentFilter === 'visited') return visited;
-      if (currentFilter === 'unvisited') return !visited;
+    features: gj.features.filter(feature => {
+
+      const city = cityData[feature.properties.name];
+      const visited = city?.visited === 'Yes';
+
+      if (currentFilter === 'visited') {
+        return visited;
+      }
+
+      if (currentFilter === 'unvisited') {
+        return !visited;
+      }
+
       return true;
     })
   };
 
   geojsonLayer = L.geoJSON(filtered, {
+
     style: getStyle,
-    onEachFeature: (feature, layer) => {
-      const name = feature.properties.name;
+
+    onEachFeature: function(feature, layer) {
+
+      const cityName = feature.properties.name;
+
       layer.on({
-        mouseover(e) {
-          if (cityData[name].visited !== 'Yes') {
-            e.target.setStyle({ fillOpacity: 0.6, weight: 1.2 });
+
+        mouseover: function(e) {
+
+          if (cityData[cityName]?.visited !== 'Yes') {
+
+            e.target.setStyle({
+              fillOpacity: 0.6,
+              weight: 2
+            });
+
           }
+
         },
-        mouseout(e) {
+
+        mouseout: function(e) {
           geojsonLayer.resetStyle(e.target);
         },
-        click(e) {
-          openSidebar(name, feature);
+
+        click: function() {
+          openSidebar(cityName, feature);
         }
+
       });
-      layer.bindTooltip(name, {
-        permanent: false, sticky: true,
-        className: 'city-tooltip',
-        offset: [0, -5]
+
+      layer.bindTooltip(cityName, {
+        sticky: true
       });
+
     }
+
   }).addTo(map);
+
 }
 
 function openSidebar(name, feature) {
-  selectedFeature = { name, feature };
+
+  selectedFeature = {
+    name,
+    feature
+  };
+
   const d = cityData[name];
 
   document.getElementById('sidebar-city').textContent = name;
-  
+
   const badge = document.getElementById('sidebar-badge');
   const badgeText = document.getElementById('badge-text');
+
   if (d.visited === 'Yes') {
-    badge.className = 'sidebar-badge visited-badge';
+
+    badge.className = 'visited-badge';
     badgeText.textContent = 'Visited';
+
   } else {
-    badge.className = 'sidebar-badge unvisited-badge';
+
+    badge.className = 'unvisited-badge';
     badgeText.textContent = 'Not yet visited';
+
   }
 
-  document.getElementById('edit-visited').value = d.visited;
-  document.getElementById('edit-date').value = d.visit_date || '';
-  document.getElementById('edit-notes').value = d.notes || '';
-  document.getElementById('edit-photo').value = d.photo || '';
+  document.getElementById('edit-visited').value =
+    d.visited || 'No';
+
+  document.getElementById('edit-date').value =
+    d.visit_date || '';
+
+  document.getElementById('edit-notes').value =
+    d.notes || '';
+
+  document.getElementById('edit-photo').value =
+    d.photo || '';
+
   updatePhotoPreview(d.photo);
 
-  document.getElementById('sidebar').classList.add('open');
-}
+  document.getElementById('sidebar')
+    .classList.add('open');
 
-function closeSidebar() {
-  document.getElementById('sidebar').classList.remove('open');
-  selectedFeature = null;
 }
-
-function updatePhotoPreview(url) {
-  const preview = document.getElementById('photo-preview');
-  const img = document.getElementById('photo-img');
-  if (url && url.startsWith('http')) {
-    img.src = url;
-    preview.style.display = 'block';
-  } else {
-    preview.style.display = 'none';
-  }
-}
-
-document.getElementById('edit-photo').addEventListener('input', e => {
-  updatePhotoPreview(e.target.value);
-});
 
 async function saveCity() {
-  const city = currentCity;
+
+  if (!selectedFeature) {
+    return;
+  }
+
+  const city = selectedFeature.name;
 
   const updatedData = {
+
     city_name: city,
-    visited: document.getElementById('edit-visited').value,
-    visit_date: document.getElementById('edit-date').value || null,
-    notes: document.getElementById('edit-notes').value,
-    photo_url: document.getElementById('edit-photo').value
+
+    visited:
+      document.getElementById('edit-visited').value,
+
+    visit_date:
+      document.getElementById('edit-date').value || null,
+
+    notes:
+      document.getElementById('edit-notes').value,
+
+    photo_url:
+      document.getElementById('edit-photo').value
+
   };
 
   const { error } = await supabase
@@ -498,48 +225,52 @@ async function saveCity() {
     });
 
   if (error) {
+
     console.error(error);
+
+    showToast('Save failed');
+
     return;
+
   }
 
-  cityData[city] = updatedData;
+  cityData[city] = {
+    visited: updatedData.visited,
+    visit_date: updatedData.visit_date,
+    notes: updatedData.notes,
+    photo: updatedData.photo_url
+  };
 
   renderLayer(GEOJSON);
 
-  showToast();
-}
+  updateStats();
+
+  showToast('✓ Visit saved');
 
 }
 
-function updateStats() {
-  const visited = Object.values(cityData).filter(d => d.visited === 'Yes').length;
-  const total = Object.keys(cityData).length;
-  const pct = ((visited / total) * 100).toFixed(1);
+function getStyle(feature) {
 
-  document.getElementById('stat-visited').textContent = visited;
-  document.getElementById('stat-remaining').textContent = total - visited;
-  document.getElementById('progress-label').textContent = `${visited} of ${total} cities visited`;
-  document.getElementById('progress-bar-inner').style.width = pct + '%';
-  document.getElementById('pct').textContent = pct + '%';
+  const d = cityData[feature.properties.name];
+
+  const visited = d?.visited === 'Yes';
+
+  return {
+
+    fillColor:
+      visited ? '#2d7a4a' : '#c8ddd4',
+
+    fillOpacity:
+      visited ? 0.8 : 0.6,
+
+    color:
+      visited ? '#1a5c32' : '#000000',
+
+    weight: 2,
+
+    opacity: 1
+
+  };
+
 }
 
-function setFilter(f) {
-  currentFilter = f;
-  ['all','visited','unvisited'].forEach(id => {
-    document.getElementById('filter-' + id).classList.toggle('active', id === f);
-  });
-  const gj = GEOJSON;
-  renderLayer(gj);
-}
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-
-initMap();
-</script>
-</body>
-</html>
