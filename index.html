@@ -20,14 +20,56 @@
       --muted:     #8a8a8a;
       --accent:    #2d6a4f;
       --accent-lt: #b7e4c7;
-      --unvisited: #d4cfc8;
+      --unvisited: #8ba89a;
       --border:    #e0ddd8;
       --shadow:    0 2px 12px rgba(0,0,0,0.08);
     }
 
     html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); }
 
+    .city-hover-label {
+  background: rgba(255,255,255,0.95);
+  border: 1px solid #d0d0d0;
+  border-radius: 6px;
+  color: #1a1a1a;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 3px 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.leaflet-interactive:focus {
+  outline: none !important;
+}
+
+.leaflet-container a:focus,
+.leaflet-container path:focus {
+  outline: none !important;
+}
+.city-hover-label:before {
+  display: none;
+}
+
     /* ── Header ── */
+    .header-brand {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.15rem;
+  color: var(--text);
+  line-height: 1.1;
+}
+
+.header-subtitle {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 2px;
+}
     header {
       position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
       background: var(--panel);
@@ -110,7 +152,7 @@
       margin-bottom: 10px;
     }
     .badge-visited   { background: var(--accent-lt); color: var(--accent); }
-    .badge-unvisited { background: #edeae4; color: var(--muted); }
+    .badge-unvisited { background: #edeae4; color: var(--unvisited); }
 
     .popup-row {
       display: flex; gap: 6px;
@@ -166,12 +208,19 @@
 
   <div id="loading">
     <div class="spinner"></div>
-    <div class="loading-title">Georgia Cities</div>
+    <div class="loading-title">City Tracker</div>
     <div class="loading-sub">Loading map data…</div>
   </div>
 
   <header>
-    <div class="header-title"><span>Georgia</span> Cities</div>
+    <div class="header-brand">
+  <div class="header-title">
+    Georgia City Visit Tracker
+  </div>
+  <div class="header-subtitle">
+    Map by Zack Kirtz
+  </div>
+</div>
     <div class="header-stats">
       <div class="stat"><strong id="stat-visited">—</strong>Visited</div>
       <div class="stat"><strong id="stat-total">—</strong>Total</div>
@@ -254,10 +303,22 @@
     }
 
     function styleFeature(visited) {
-      return visited
-        ? { fillColor: '#2d6a4f', fillOpacity: 0.55, color: '#1b4332', weight: 0.8, opacity: 0.9 }
-        : { fillColor: '#d4cfc8', fillOpacity: 0.45, color: '#b0aba4', weight: 0.5, opacity: 0.8 };
-    }
+  return visited
+    ? {
+        fillColor: '#2d7a4a',
+        fillOpacity: .8,
+        color: '#1b4332',
+        weight: 0.8,
+        opacity: 0.9
+      }
+    : {
+        fillColor: '#8ba89a',
+        fillOpacity: 0.2,
+        color: '#5f7d6f',
+        weight: 0.8,
+        opacity: 1.0
+      };
+}
 
     // ── Fetch Supabase data ──────────────────────────────────
     async function fetchSupabaseData() {
@@ -318,15 +379,34 @@
             className: 'clean-popup'
           });
 
-          layer.on('mouseover', function () {
-            this.setStyle({ fillOpacity: visited ? 0.8 : 0.65, weight: 1.5 });
-          });
-          layer.on('mouseout', function () {
-            this.setStyle(styleFeature(visited));
-          });
-          layer.on('click', function () {
-            this.openPopup();
-          });
+          // Use Supabase name if available, otherwise GeoJSON name
+const displayName =
+  (dbRow?.[COL_NAME] || props.name || 'Unknown').trim();
+
+layer.bindTooltip(displayName, {
+  sticky: true,
+  direction: 'top',
+  offset: [0, -5],
+  className: 'city-hover-label'
+});
+
+layer.on('mouseover', function () {
+  this.setStyle({
+    fillOpacity: visited ? 0.8 : 0.65,
+    weight: 1.5
+  });
+
+  this.openTooltip();
+});
+
+layer.on('mouseout', function () {
+  this.setStyle(styleFeature(visited));
+  this.closeTooltip();
+});
+
+layer.on('click', function () {
+  this.openPopup();
+});
         }
       }).addTo(map);
 
