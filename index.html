@@ -191,7 +191,7 @@
     // ── Config ──────────────────────────────────────────────
     const SUPABASE_URL  = 'https://foshraaftkinhnnchnwf.supabase.co';
     const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZvc2hyYWFmdGtpbmhubmNobndmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NTMwMDksImV4cCI6MjA5NTMyOTAwOX0._a7Ogu9Y9ZowVM0Ljq4jTZgV7QiqSl4dD-5hsirjPbE';
-    const TABLE_NAME    = 'georgia_cities'; // ← update if your table has a different name
+    const TABLE_NAME    = 'city_visits'; // ← update if your table has a different name
 
     // Column names — update these if yours differ
     const COL_NAME       = 'name';
@@ -228,13 +228,11 @@
     }
 
     function buildPopup(props, dbRow) {
-  const useDB   = dbRow != null;
-  const visited = isVisited(useDB ? dbRow[COL_VISITED]    : props.visited);
-  const date    = formatDate(useDB ? dbRow[COL_VISIT_DATE] : props.visit_date);
-  const notes   = useDB
-    ? (dbRow[COL_NOTES] || '').trim()     
-    : (props.notes || '').trim();           
-  const name    = (useDB ? dbRow[COL_NAME] : props.name) ?? 'Unknown';
+      // Always use Supabase data exclusively — GeoJSON fields are geometry-only
+      const visited = dbRow != null ? isVisited(dbRow[COL_VISITED])    : false;
+      const date    = dbRow != null ? formatDate(dbRow[COL_VISIT_DATE]) : null;
+      const notes   = dbRow != null ? (dbRow[COL_NOTES] || '').trim()   : '';
+      const name    = (dbRow != null ? dbRow[COL_NAME] : null) ?? props.name ?? 'Unknown';
 
       return `
         <div class="popup-inner">
@@ -303,14 +301,14 @@
         style: feature => {
           const name    = (feature.properties.name || '').trim().toLowerCase();
           const dbRow   = dbMap[name];
-          const visited = isVisited(dbRow ? dbRow[COL_VISITED] : feature.properties.visited);
+          const visited = dbRow != null ? isVisited(dbRow[COL_VISITED]) : false;
           return styleFeature(visited);
         },
         onEachFeature: (feature, layer) => {
           const props   = feature.properties;
           const name    = (props.name || '').trim().toLowerCase();
           const dbRow   = dbMap[name];
-          const visited = isVisited(dbRow ? dbRow[COL_VISITED] : props.visited);
+          const visited = dbRow != null ? isVisited(dbRow[COL_VISITED]) : false;
 
           totalCount++;
           if (visited) visitedCount++;
