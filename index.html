@@ -228,11 +228,13 @@
     }
 
     function buildPopup(props, dbRow) {
-      const row     = dbRow || {};
-      const visited = isVisited(row[COL_VISITED] ?? props.visited);
-      const date    = formatDate(row[COL_VISIT_DATE] ?? props.visit_date);
-      const notes   = (row[COL_NOTES] ?? props.notes ?? '').trim();
-      const name    = row[COL_NAME]  ?? props.name ?? 'Unknown';
+  const useDB   = dbRow != null;
+  const visited = isVisited(useDB ? dbRow[COL_VISITED]    : props.visited);
+  const date    = formatDate(useDB ? dbRow[COL_VISIT_DATE] : props.visit_date);
+  const notes   = useDB
+    ? (dbRow[COL_NOTES] || '').trim()     
+    : (props.notes || '').trim();           
+  const name    = (useDB ? dbRow[COL_NAME] : props.name) ?? 'Unknown';
 
       return `
         <div class="popup-inner">
